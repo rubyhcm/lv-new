@@ -92,6 +92,31 @@ Results (AUROC/F1 report, ROC png, `scores_*.npy`) are written to `outputs/<data
 
 ## Ablations
 
+## Hybrid-RAG foundation
+
+The repository includes the first controlled H-RAG components described in the
+thesis plan:
+
+- `lanobert.field_value` validates structured log fields and evaluates
+  auditable response-time, heartbeat, severity, and host constraints without
+  invoking the language model.
+- `lanobert.fusion` combines the frozen LAnoBERT representation with semantic
+  context and the hard-state vector through a trainable gated layer.
+
+The baseline must be frozen with `freeze_baseline()` before optimizing the
+fusion layer. The optional thresholds are shown in `configs/bgl.yaml`; unset
+thresholds remain inactive.
+
+The current reproducible experiment foundation also includes:
+
+- `lanobert.structured.extract_fields()` for BGL-style and key-value logs.
+- `lanobert.ontology.TfidfOntologyRetriever` as a local deterministic
+  ontology baseline before a Qdrant deployment.
+- `lanobert.early_detection` for early-warning rate and detection lead time.
+
+These components allow the E0--E3 ablation workflow to be tested on a small
+fixture before running the full datasets.
+
 Every variant uses the same BERT encoder; they differ only in the vocabulary and how the weights are trained. The released checkpoints are the main model (row 1). Each cell is **AUROC / best-F1**: top line `error_mean`, bottom line fixed top-k (k=5).
 
 | # | Vocabulary | Training | BGL | HDFS | Thunderbird |
