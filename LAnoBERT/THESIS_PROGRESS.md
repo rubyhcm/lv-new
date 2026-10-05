@@ -312,3 +312,59 @@ Chỉ sau khi E0--E3 chạy được trên fixture nhỏ mới:
 - Lưu config, seed và kết quả cho từng experiment.
 - Không kết luận Hybrid-RAG tốt hơn nếu chưa có E0 đối chứng trên cùng dữ liệu.
 - Không đưa Qdrant vào trước khi ontology baseline cục bộ có số liệu.
+
+## 8. Quy tắc cập nhật tiến độ
+
+Sau mỗi thay đổi đáng kể, lần chạy thực nghiệm, lỗi môi trường hoặc kết quả
+kiểm thử, phải cập nhật file này để giữ một nhật ký tiến độ duy nhất cho
+luận văn. Mỗi cập nhật nên ghi rõ:
+
+- ngày/giờ hoặc mốc thực hiện;
+- file hoặc module đã thay đổi;
+- lệnh đã chạy;
+- kết quả thành công/thất bại;
+- bước tiếp theo và điều kiện để thực hiện bước đó.
+
+## 9. Kaggle sử dụng trực tiếp GitHub
+
+Đã tạo notebook:
+
+- [kaggle_github_step_by_step.ipynb](kaggle_github_step_by_step.ipynb)
+
+Notebook clone trực tiếp repository:
+
+```text
+https://github.com/rubyhcm/lv-new.git
+```
+
+Notebook được chia thành các cell độc lập để kiểm tra lần lượt:
+
+1. GPU và môi trường Python.
+2. Clone repository và ghi nhận commit.
+3. Cài dependencies.
+4. Chạy pytest và kiểm tra shell script.
+5. Kiểm tra hoặc tải dữ liệu BGL.
+6. Split và preprocess.
+7. Train tokenizer.
+8. Train LAnoBERT baseline.
+9. Inference và đọc báo cáo.
+10. Đóng gói artifact.
+
+Đã xác minh cục bộ:
+
+```text
+Notebook JSON hợp lệ
+Các code cell Python compile thành công
+```
+
+Raw BGL không được giả định là có trong GitHub. Khi chạy Kaggle cần một trong
+hai phương án:
+
+- bật Internet và đặt `DOWNLOAD_BGL = True`;
+- cung cấp BGL từ một Kaggle Dataset riêng.
+
+Artifact dự kiến sau khi chạy là:
+
+```text
+/kaggle/working/lanobert-results.zip
+```

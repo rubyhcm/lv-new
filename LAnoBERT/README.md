@@ -139,6 +139,13 @@ Remove `--epochs` and `--max-eval-samples` for the full experiment. If BGL is
 not uploaded, add `--download-data` and enable Kaggle Internet. The final
 artifact is written to `/kaggle/working/lanobert-results.zip`.
 
+For interactive execution, use
+[kaggle_github_step_by_step.ipynb](kaggle_github_step_by_step.ipynb). It clones
+`https://github.com/rubyhcm/lv-new.git` directly and exposes separate cells for
+GPU checks, tests, data preparation, tokenizer training, model training, and
+inference. Large raw logs still need to be attached separately or downloaded
+with Kaggle Internet enabled; they should not be committed to Git.
+
 Every variant uses the same BERT encoder; they differ only in the vocabulary and how the weights are trained. The released checkpoints are the main model (row 1). Each cell is **AUROC / best-F1**: top line `error_mean`, bottom line fixed top-k (k=5).
 
 | # | Vocabulary | Training | BGL | HDFS | Thunderbird |
