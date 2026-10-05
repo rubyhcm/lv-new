@@ -43,6 +43,13 @@ def train_tokenizer(
         special_tokens=SPECIAL_TOKENS,
         wordpieces_prefix="##",
     )
+    actual_vocab_size = tokenizer.get_vocab_size()
+    if actual_vocab_size <= len(SPECIAL_TOKENS):
+        raise ValueError(
+            f"Tokenizer learned only {actual_vocab_size} tokens from {train_files}. "
+            "The normalized training corpus is empty or invalid; refusing to "
+            "create a model that would train with zero loss."
+        )
     ensure_dir(out_dir)
     tokenizer.save_model(out_dir, name)
     vocab_path = os.path.join(out_dir, f"{name}-vocab.txt")
@@ -55,7 +62,10 @@ def load_tokenizer(vocab_file: str, max_len: int = 512):
     from transformers import BertTokenizerFast
 
     return BertTokenizerFast(
-        vocab_file=vocab_file,
+        # Transformers 5 renamed the constructor argument from vocab_file to
+        # vocab. Passing vocab_file is silently ignored and leaves only the
+        # five special tokens.
+        vocab=vocab_file,
         max_len=max_len,
         do_lower_case=False,
     )

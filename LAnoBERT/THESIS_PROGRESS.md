@@ -369,6 +369,133 @@ Artifact dự kiến sau khi chạy là:
 /kaggle/working/lanobert-results.zip
 ```
 
+### Checkpoint 11 — notebook Kaggle gửi về chưa có execution logs
+
+File `lv-new-1.ipynb` được đính kèm để kiểm tra hiện chỉ chứa phần Markdown
+tiêu đề của notebook, không chứa các code cell hoặc output đã chạy. File output
+đi kèm cũng chỉ là:
+
+```json
+[]
+```
+
+Do đó chưa thể đối chiếu các bước split, train, inference hoặc các metric
+AUROC/F1. Cần tải notebook đã lưu cùng output từ Kaggle, hoặc gửi riêng log
+của các cell train/inference.
+
+Để xuất đúng trên Kaggle:
+
+1. Chọn `File -> Download notebook`.
+2. Đảm bảo notebook đã chạy và output vẫn hiển thị trước khi tải.
+3. Nếu dùng `Save Version`, bật tùy chọn lưu output của notebook.
+4. Gửi file `.ipynb` đã download, không chỉ bản notebook template.
+
+Các output cần có để kiểm tra:
+
+```text
+[train] loaded tokenizer ...
+[train] examples ...
+[train] start
+...
+[eval:...] AUROC=...
+best_F1=...
+```
+
+Nếu không muốn tải lại notebook, gửi nội dung của các cell hiển thị:
+
+```python
+print(runtime_config.read_text())
+```
+
+và toàn bộ output của cell `train` và `inference`.
+
+### Checkpoint 12 — training không hợp lệ do tokenizer chỉ có 5 token
+
+Log Kaggle cho thấy:
+
+```text
+[train] loaded tokenizer (vocab=5)
+loss=0
+grad_norm=0
+eval_loss=nan
+```
+
+`vocab=5` đúng bằng số special token mặc định:
+
+```text
+[PAD], [UNK], [CLS], [SEP], [MASK]
+```
+
+Vì vậy model 86 triệu tham số đã chạy gần 5 giờ nhưng không học được dữ liệu.
+Kết quả này phải loại bỏ, không dùng làm E0 baseline. Nguyên nhân cần xác
+minh là file normalized train corpus rỗng/sai hoặc tokenizer cũ được tái sử
+dụng sau khi đổi dữ liệu.
+
+Đã thêm guard vào `lanobert/tokenizer.py`: nếu tokenizer học được không quá 5
+token, pipeline sẽ dừng ngay với lỗi rõ ràng thay vì train model giả.
+
+Trên Kaggle, cần xóa artifact tokenizer cũ và chẩn đoán trước khi train lại:
+
+```python
+import shutil
+from pathlib import Path
+
+train_file = PROJECT / 'data/BGL/BGL_train_normal_parsed.log'
+tokenizer_dir = PROJECT / 'outputs/BGL/tokenizer'
+
+print('train file:', train_file)
+print('exists:', train_file.exists())
+print('size MB:', train_file.stat().st_size / (1024**2) if train_file.exists() else None)
+with train_file.open(errors='replace') as handle:
+    samples = [next(handle, '').strip() for _ in range(5)]
+print('samples:', samples)
+print('non-empty samples:', sum(bool(x) for x in samples))
+
+if tokenizer_dir.exists():
+    shutil.rmtree(tokenizer_dir)
+```
+
+Chỉ chạy tokenizer lại khi sample có nội dung log hợp lệ và `size MB` khác 0.
+
+### Checkpoint 13 — xác định lỗi tương thích Transformers làm mất vocabulary
+
+Kiểm tra file local `outputs/BGL/tokenizer/BGL_LogBERT-vocab.txt` cho thấy file
+hoàn toàn hợp lệ:
+
+```text
+1000 dòng
+5 special tokens
+995 learned tokens
+```
+
+Corpus normalized cũng hợp lệ:
+
+```text
+2,550,501 dòng
+181,682,861 bytes
+```
+
+Nguyên nhân `vocab=5` là API của Transformers mới. Trong Transformers 5.16.1,
+constructor của `BertTokenizerFast` nhận tham số `vocab`, không còn xử lý đúng
+tham số `vocab_file`. Code cũ truyền `vocab_file=...`; tham số này bị bỏ qua
+âm thầm, nên tokenizer chỉ còn `[PAD]`, `[UNK]`, `[CLS]`, `[SEP]`, `[MASK]`.
+
+Đã sửa `lanobert/tokenizer.py` để truyền `vocab=vocab_file`. Kiểm tra local:
+
+```text
+BertTokenizerFast(vocab_file=...) -> vocab_size=5
+BertTokenizerFast(vocab=...)      -> vocab_size=1000
+```
+
+Do đó cần clone commit mới trên Kaggle và chạy lại tokenizer/train. Không cần
+preprocess BGL lại nếu file `BGL_train_normal_parsed.log` đã tồn tại hợp lệ.
+
+Đã thêm một validation cell ngay trước cell train trong
+`kaggle_github_step_by_step.ipynb`. Cell này kiểm tra project/config path,
+corpus tồn tại và không rỗng, `tokenizer.vocab_size > 5`, sample có content
+token, và MLM probe batch có label khác `-100`. Nếu một điều kiện thất bại,
+notebook dừng trước khi khởi tạo training model.
+
 ## 10. Checklist chạy Kaggle tiếp theo
 
 ### Trên máy local

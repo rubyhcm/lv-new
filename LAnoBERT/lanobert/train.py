@@ -142,6 +142,35 @@ def train(cfg, vocab_file: Optional[str] = None) -> str:
     else:
         tokenizer = load_tokenizer(vocab_file, max_len=max_len)
         print(f"[train] loaded tokenizer (vocab={tokenizer.vocab_size})")
+        if tokenizer.vocab_size <= 5:
+            raise ValueError(
+                f"Tokenizer vocabulary has only {tokenizer.vocab_size} entries; "
+                "it contains no learned log tokens. Retrain it from a valid "
+                "normalized corpus and remove stale tokenizer artifacts."
+            )
+        corpus_path = cfg.get_path("paths.train_normal")
+        with open(corpus_path, "r", encoding="utf-8") as corpus:
+            sample_lines = [line.strip() for _, line in zip(range(32), corpus) if line.strip()]
+        if not sample_lines:
+            raise ValueError(f"Normalized training corpus is empty: {corpus_path}")
+        encoded_sample = tokenizer(sample_lines, add_special_tokens=False)["input_ids"]
+        content_ids = [
+            token_id
+            for line_ids in encoded_sample
+            for token_id in line_ids
+            if token_id not in {
+                tokenizer.pad_token_id,
+                tokenizer.unk_token_id,
+                tokenizer.cls_token_id,
+                tokenizer.sep_token_id,
+                tokenizer.mask_token_id,
+            }
+        ]
+        if not content_ids:
+            raise ValueError(
+                f"Tokenizer produced no learned content tokens for {corpus_path}; "
+                "the corpus and tokenizer do not match."
+            )
         model = build_model(
             vocab_size=tokenizer.vocab_size,
             max_len=max_len,
@@ -175,6 +204,14 @@ def train(cfg, vocab_file: Optional[str] = None) -> str:
         mlm_probability=float(tcfg.get("mlm_probability", 0.15)),
         pad_to_multiple_of=8,
     )
+    if len(full_dataset) == 0:
+        raise ValueError("Training dataset contains no non-empty examples.")
+    probe = collator([full_dataset[i] for i in range(min(8, len(full_dataset)))])
+    if not (probe["labels"] != -100).any():
+        raise ValueError(
+            "MLM probe batch contains no valid masked labels; refusing to start "
+            "training because loss would be zero or NaN."
+        )
 
     model_dir = ensure_dir(cfg.get_path("paths.model_dir"))
     eval_steps = int(tcfg.get("eval_steps", tcfg.get("save_steps", 50000)))
