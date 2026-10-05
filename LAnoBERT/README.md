@@ -117,6 +117,28 @@ The current reproducible experiment foundation also includes:
 These components allow the E0--E3 ablation workflow to be tested on a small
 fixture before running the full datasets.
 
+## Running on Kaggle
+
+The [kaggle_run.py](kaggle_run.py) script copies the project to
+`/kaggle/working`, installs dependencies, prepares BGL, trains the tokenizer
+and baseline, runs inference, and creates `lanobert-results.zip`.
+
+Upload this repository as a Kaggle Dataset, attach it to a GPU notebook, and
+run the following cell. If BGL is included in the dataset, Internet is not
+required:
+
+```bash
+!python /kaggle/input/<dataset-name>/kaggle_run.py \
+    --project-input /kaggle/input/<dataset-name> \
+    --config configs/bgl.yaml \
+    --epochs 1 \
+    --max-eval-samples 10000
+```
+
+Remove `--epochs` and `--max-eval-samples` for the full experiment. If BGL is
+not uploaded, add `--download-data` and enable Kaggle Internet. The final
+artifact is written to `/kaggle/working/lanobert-results.zip`.
+
 Every variant uses the same BERT encoder; they differ only in the vocabulary and how the weights are trained. The released checkpoints are the main model (row 1). Each cell is **AUROC / best-F1**: top line `error_mean`, bottom line fixed top-k (k=5).
 
 | # | Vocabulary | Training | BGL | HDFS | Thunderbird |
