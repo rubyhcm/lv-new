@@ -10,8 +10,14 @@ set -euo pipefail
 CONFIG="${1:-configs/bgl.yaml}"
 echo "==> config: $CONFIG"
 
+if command -v python >/dev/null 2>&1; then
+    PYTHON_BIN=python
+else
+    PYTHON_BIN=python3
+fi
+
 # helper: read a yaml value by key (simple flat lookup via python)
-yq() { python -c "import yaml,sys; c=yaml.safe_load(open('$CONFIG')); 
+yq() { "$PYTHON_BIN" -c "import yaml,sys; c=yaml.safe_load(open('$CONFIG')); 
 keys='$1'.split('.'); v=c
 for k in keys: v=v[k]
 print(v)"; }
@@ -26,17 +32,17 @@ echo "==> [3/5] train tokenizer"
 if [ -d "$TOK_DIR" ] && [ "$(ls -A "$TOK_DIR" 2>/dev/null)" ]; then
     echo "    SKIP (already exists: $TOK_DIR)"
 else
-    python -m lanobert.tokenizer --config "$CONFIG"
+    "$PYTHON_BIN" -m lanobert.tokenizer --config "$CONFIG"
 fi
 
 echo "==> [4/5] train MLM"
 if [ -d "$MODEL_DIR/final" ]; then
     echo "    SKIP (already exists: $MODEL_DIR/final)"
 else
-    python -m lanobert.train --config "$CONFIG"
+    "$PYTHON_BIN" -m lanobert.train --config "$CONFIG"
 fi
 
 echo "==> [5/5] inference + evaluate"
-python -m lanobert.inference --config "$CONFIG"
+"$PYTHON_BIN" -m lanobert.inference --config "$CONFIG"
 
 echo "==> done. results under outputs/<dataset>/results"
