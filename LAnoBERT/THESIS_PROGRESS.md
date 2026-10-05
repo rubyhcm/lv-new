@@ -742,3 +742,71 @@ bản dự kiến trong requirements. Đã cập nhật `lanobert/train.py` đ�
 
 Các bước split, preprocessing và tokenization vẫn hợp lệ. Sau khi push commit
 mới, clone lại GitHub trên Kaggle rồi chạy lại cell train.
+
+### Ghi chú về số epoch: smoke run và baseline
+
+`EPOCHS = 1` trong notebook/Kaggle runtime chỉ là **smoke run**, dùng để kiểm
+tra:
+
+- pipeline có chạy hết từ dữ liệu đến inference hay không;
+- GPU và dependencies có hoạt động hay không;
+- model/checkpoint có được tạo đúng hay không;
+- các lỗi tương thích `transformers` có còn hay không.
+
+Đây **không phải** cấu hình baseline dùng cho luận văn.
+
+Cấu hình baseline chính thức trong [configs/bgl.yaml](configs/bgl.yaml) là:
+
+```yaml
+train:
+  num_train_epochs: 10
+```
+
+Sau khi smoke run thành công, phải chạy lại Kaggle với:
+
+```python
+EPOCHS = 10
+MAX_EVAL_SAMPLES = None
+```
+
+Kết quả của lần chạy 10 epochs trên toàn bộ test set mới được ghi là E0
+LAnoBERT baseline. Không dùng kết quả của lần chạy 1 epoch/10.000 mẫu để
+đối chiếu chính thức với E1--E3.
+
+### Checkpoint 10 — config baseline chính thức
+
+Đã tạo config riêng cho pipeline baseline:
+
+```text
+configs/bgl_baseline.yaml
+```
+
+Config này giữ cùng preprocessing, tokenizer, batch size, learning rate,
+seed và scoring như `configs/bgl.yaml`, nhưng tách riêng artifact và đặt:
+
+```text
+run_name: bgl_baseline_e0
+num_train_epochs: 10
+max_eval_samples: null
+```
+
+Artifact baseline sẽ được ghi riêng tại:
+
+```text
+outputs/BGL/baseline_tokenizer/
+outputs/BGL/baseline_model/
+outputs/BGL/baseline_results/
+```
+
+Sau khi smoke run 1 epoch pass, chạy baseline bằng:
+
+```bash
+cd /Users/ruby/dev/lv-new/LAnoBERT
+python3 -m lanobert.tokenizer --config configs/bgl_baseline.yaml
+python3 -m lanobert.train --config configs/bgl_baseline.yaml
+python3 -m lanobert.inference --config configs/bgl_baseline.yaml
+```
+
+Trên Kaggle, dùng cùng các lệnh qua `subprocess.run(..., cwd=PROJECT)` và
+truyền `configs/bgl_baseline.yaml`. Không chạy `ensure_data.sh` lại nếu các
+file dữ liệu đã tồn tại; config baseline dùng lại các file BGL đã preprocess.
