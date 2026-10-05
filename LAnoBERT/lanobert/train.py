@@ -10,6 +10,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import inspect
 import os
 from typing import List, Optional
 
@@ -37,6 +38,30 @@ def build_model(vocab_size: int, max_len: int, attn_implementation: str = "sdpa"
     except (TypeError, ValueError):
         # older transformers without attn_implementation kwarg
         return BertForMaskedLM(config=config)
+
+
+def _build_training_args(training_args_cls, values):
+    """Build TrainingArguments across supported transformers API versions."""
+    supported = inspect.signature(training_args_cls).parameters
+    aliases = {
+        "eval_strategy": "evaluation_strategy",
+    }
+    normalized = {}
+    skipped = []
+    for name, value in values.items():
+        target = name
+        if target not in supported:
+            target = aliases.get(name)
+        if target in supported:
+            normalized[target] = value
+        else:
+            skipped.append(name)
+    if skipped:
+        print(
+            "[train] transformers does not support TrainingArguments options; "
+            f"skipping: {', '.join(skipped)}"
+        )
+    return training_args_cls(**normalized)
 
 
 def train(cfg, vocab_file: Optional[str] = None) -> str:
@@ -154,34 +179,34 @@ def train(cfg, vocab_file: Optional[str] = None) -> str:
     model_dir = ensure_dir(cfg.get_path("paths.model_dir"))
     eval_steps = int(tcfg.get("eval_steps", tcfg.get("save_steps", 50000)))
     seed = int(tcfg.get("seed", 42))
-    training_args = TrainingArguments(
-        output_dir=model_dir,
-        seed=seed,
-        data_seed=seed,
-        full_determinism=bool(tcfg.get("full_determinism", False)),
-        num_train_epochs=float(tcfg.get("num_train_epochs", 10)),
-        per_device_train_batch_size=int(tcfg.get("per_device_train_batch_size", 8)),
-        per_device_eval_batch_size=int(tcfg.get("per_device_eval_batch_size", 64)),
-        learning_rate=float(tcfg.get("learning_rate", 5e-5)),
-        weight_decay=float(tcfg.get("weight_decay", 0.01)),
-        warmup_ratio=float(tcfg.get("warmup_ratio", 0.1)),
-        lr_scheduler_type=str(tcfg.get("lr_scheduler_type", "cosine")),
-        adam_beta2=float(tcfg.get("adam_beta2", 0.98)),
-        adam_epsilon=float(tcfg.get("adam_epsilon", 1e-6)),
-        bf16=bool(tcfg.get("bf16", torch.cuda.is_available())),
-        eval_strategy="steps",
-        eval_steps=eval_steps,
-        save_strategy="steps",
-        save_steps=eval_steps,
-        save_total_limit=int(tcfg.get("save_total_limit", 2)),
-        load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
-        greater_is_better=False,
-        logging_steps=int(tcfg.get("logging_steps", 1000)),
-        logging_dir=os.path.join(model_dir, "logs"),
-        dataloader_num_workers=4,
-        report_to=["tensorboard"],
-    )
+    training_args = _build_training_args(TrainingArguments, {
+        "output_dir": model_dir,
+        "seed": seed,
+        "data_seed": seed,
+        "full_determinism": bool(tcfg.get("full_determinism", False)),
+        "num_train_epochs": float(tcfg.get("num_train_epochs", 10)),
+        "per_device_train_batch_size": int(tcfg.get("per_device_train_batch_size", 8)),
+        "per_device_eval_batch_size": int(tcfg.get("per_device_eval_batch_size", 64)),
+        "learning_rate": float(tcfg.get("learning_rate", 5e-5)),
+        "weight_decay": float(tcfg.get("weight_decay", 0.01)),
+        "warmup_ratio": float(tcfg.get("warmup_ratio", 0.1)),
+        "lr_scheduler_type": str(tcfg.get("lr_scheduler_type", "cosine")),
+        "adam_beta2": float(tcfg.get("adam_beta2", 0.98)),
+        "adam_epsilon": float(tcfg.get("adam_epsilon", 1e-6)),
+        "bf16": bool(tcfg.get("bf16", torch.cuda.is_available())),
+        "eval_strategy": "steps",
+        "eval_steps": eval_steps,
+        "save_strategy": "steps",
+        "save_steps": eval_steps,
+        "save_total_limit": int(tcfg.get("save_total_limit", 2)),
+        "load_best_model_at_end": True,
+        "metric_for_best_model": "eval_loss",
+        "greater_is_better": False,
+        "logging_steps": int(tcfg.get("logging_steps", 1000)),
+        "logging_dir": os.path.join(model_dir, "logs"),
+        "dataloader_num_workers": 4,
+        "report_to": ["tensorboard"],
+    })
 
     trainer = Trainer(
         model=model,

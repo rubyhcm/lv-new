@@ -722,3 +722,23 @@ tham số này. Tham số không cần thiết cho pipeline hiện tại vì `ou
 Sau khi push commit sửa lên GitHub, cần clone lại repository trên Kaggle rồi
 chạy lại cell train. Không cần chạy lại preprocessing nếu các file trong
 `data/BGL/` vẫn còn.
+
+### Checkpoint 9 — lỗi `warmup_ratio` trên Kaggle
+
+Sau khi bỏ `overwrite_output_dir`, Kaggle tiếp tục báo:
+
+```text
+TypeError: TrainingArguments.__init__() got an unexpected keyword argument
+'warmup_ratio'
+```
+
+Điều này xác nhận API `TrainingArguments` trong runtime Kaggle khác với phiên
+bản dự kiến trong requirements. Đã cập nhật `lanobert/train.py` để:
+
+- đọc chữ ký constructor bằng `inspect.signature`;
+- ánh xạ `eval_strategy` sang `evaluation_strategy` nếu cần;
+- chỉ truyền tham số được phiên bản hiện tại hỗ trợ;
+- in danh sách tham số bị bỏ qua để không che giấu khác biệt môi trường.
+
+Các bước split, preprocessing và tokenization vẫn hợp lệ. Sau khi push commit
+mới, clone lại GitHub trên Kaggle rồi chạy lại cell train.
