@@ -156,7 +156,6 @@ def train(cfg, vocab_file: Optional[str] = None) -> str:
     seed = int(tcfg.get("seed", 42))
     training_args = TrainingArguments(
         output_dir=model_dir,
-        overwrite_output_dir=True,
         seed=seed,
         data_seed=seed,
         full_determinism=bool(tcfg.get("full_determinism", False)),

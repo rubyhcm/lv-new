@@ -368,3 +368,357 @@ Artifact dự kiến sau khi chạy là:
 ```text
 /kaggle/working/lanobert-results.zip
 ```
+
+## 10. Checklist chạy Kaggle tiếp theo
+
+### Trên máy local
+
+Đảm bảo các thay đổi mới nhất đã được push lên branch `main`:
+
+```bash
+cd /Users/ruby/dev/lv-new/LAnoBERT
+git add README.md THESIS_PROGRESS.md kaggle_github_step_by_step.ipynb
+git commit -m "Add GitHub-based Kaggle workflow"
+git push origin main
+```
+
+### Trên Kaggle
+
+1. Tạo notebook mới.
+2. Bật `Settings -> Accelerator -> GPU`.
+3. Bật `Internet` nếu muốn notebook tự tải BGL.
+4. Mở hoặc tải `kaggle_github_step_by_step.ipynb`.
+5. Chạy các cell tuần tự, không chạy đồng thời.
+6. Trong cell cấu hình, dùng:
+
+```python
+DOWNLOAD_BGL = True
+EPOCHS = 1
+MAX_EVAL_SAMPLES = 10000
+```
+
+7. Xác nhận cell clone in ra commit mới nhất từ GitHub.
+8. Xác nhận test pass trước khi chạy dữ liệu lớn.
+9. Xác nhận các file preprocessing tồn tại trước khi train.
+10. Sau khi inference hoàn tất, tải:
+    `/kaggle/working/lanobert-results.zip`.
+
+Sau lần chạy thử thành công, chạy lại với:
+
+```python
+DOWNLOAD_BGL = True
+EPOCHS = 10
+MAX_EVAL_SAMPLES = None
+```
+
+## 11. Trạng thái Kaggle thực tế
+
+### Checkpoint 1 — cấu hình notebook
+
+Đã xác nhận cell đầu tiên trên Kaggle chạy thành công với:
+
+```text
+GitHub: https://github.com/rubyhcm/lv-new.git
+Working clone: /kaggle/working/lv-new
+```
+
+Điều này xác nhận notebook đã nhận đúng repository GitHub và thư mục làm việc
+dự kiến. Bước tiếp theo là kiểm tra GPU/PyTorch, sau đó mới clone repository
+và chạy các bước cài đặt, test, dữ liệu và huấn luyện.
+
+### Checkpoint 2 — GPU và framework
+
+Cell kiểm tra môi trường Kaggle đã cho kết quả:
+
+```text
+Python: 3.13.15
+PyTorch: 2.11.0+cu128
+CUDA available: True
+GPU: Tesla T4
+```
+
+Môi trường GPU đã sẵn sàng để chạy LAnoBERT. Chưa chạy training ở checkpoint
+này; cần clone và kiểm tra đúng commit GitHub trước.
+
+### Checkpoint 3 — clone GitHub
+
+Notebook đã clone thành công repository:
+
+```text
+Project: /kaggle/working/lv-new/LAnoBERT
+Commit: 61664262630341c2d2022a889e87897bffdc09a2
+```
+
+Commit này là mốc mã nguồn cần ghi cùng các kết quả thực nghiệm Kaggle để
+đảm bảo khả năng tái lập. Bước tiếp theo là cài dependencies trong môi trường
+Kaggle.
+
+### Checkpoint 4 — lỗi đường dẫn requirements
+
+Cell cài dependencies thất bại vì notebook cũ dùng đường dẫn:
+
+```text
+/kaggle/working/LAnoBERT/requirements.txt
+```
+
+Trong khi cell clone thực tế tạo project tại:
+
+```text
+/kaggle/working/lv-new/LAnoBERT
+```
+
+Nguyên nhân là repository GitHub có thư mục gốc `lv-new`, bên trong mới có
+`LAnoBERT`. Notebook đã được sửa để dùng biến `PROJECT` được xác định ở cell 3:
+
+```python
+%pip install -q -r {PROJECT / 'requirements.txt'} pytest
+```
+
+Để tiếp tục notebook đang mở, chạy lại cell 4 với lệnh trên. Không cần clone
+lại repository.
+
+### Checkpoint 4b — cài dependencies thành công
+
+Cell 4 đã chạy lại thành công với đường dẫn `PROJECT`. Output chỉ còn:
+
+```text
+Note: you may need to restart the kernel to use updated packages.
+```
+
+Đây là thông báo chuẩn của `%pip` trong Jupyter, không phải lỗi cài đặt.
+Không cần restart kernel nếu các import kiểm tra bên dưới đều thành công.
+
+Lệnh kiểm tra:
+
+```python
+import torch
+import transformers
+import pydantic
+import sklearn
+import pytest
+
+print("torch:", torch.__version__)
+print("transformers:", transformers.__version__)
+print("pydantic:", pydantic.__version__)
+print("sklearn:", sklearn.__version__)
+print("pytest:", pytest.__version__)
+```
+
+Bước tiếp theo là chuyển vào thư mục project và kiểm tra config cùng dữ liệu
+BGL.
+
+### Checkpoint 5 — project và dữ liệu BGL
+
+Cell kiểm tra project đã cho kết quả:
+
+```text
+Current directory: /kaggle/working/lv-new/LAnoBERT
+Config: True
+BGL directory: False
+```
+
+Mã nguồn và config đã được nhận đúng. `BGL directory: False` là bình thường
+vì raw log lớn không được commit vào GitHub. Cần tải BGL trong Kaggle bằng
+cell dữ liệu với `DOWNLOAD_BGL = True` và Kaggle Internet được bật.
+
+### Checkpoint 5b — BGL đã import vào Kaggle Input
+
+Ảnh Kaggle xác nhận dữ liệu đã được import tại dataset:
+
+```text
+/kaggle/input/dataset-input-0409/BGL/
+```
+
+Trong đó có `BGL.log` và các file split/preprocess đã tạo sẵn. Cell 5/6 vẫn
+không thấy vì notebook đang tìm tại:
+
+```text
+/kaggle/working/lv-new/LAnoBERT/data/BGL/
+```
+
+Đã cập nhật notebook để tự quét:
+
+```text
+/kaggle/input/*/BGL/BGL.log
+```
+
+và copy các file BGL vào thư mục project trước khi chạy các bước tiếp theo.
+Trong notebook Kaggle hiện tại, có thể chạy thủ công đoạn sau ở cell dữ liệu:
+
+```python
+from pathlib import Path
+import shutil
+
+source_bgl = Path('/kaggle/input/dataset-input-0409/BGL')
+target_bgl = PROJECT / 'data/BGL'
+target_bgl.mkdir(parents=True, exist_ok=True)
+for source in source_bgl.iterdir():
+    target = target_bgl / source.name
+    if source.is_file() and not target.exists():
+        shutil.copy2(source, target)
+print(*sorted(str(p) for p in target_bgl.iterdir()), sep='\n')
+```
+
+Sau đó kiểm tra:
+
+```python
+raw_log = PROJECT / 'data/BGL/BGL.log'
+assert raw_log.exists()
+```
+
+### Checkpoint 6 — lỗi clone khi chạy lại cell 3
+
+Khi chạy lại cell 3, Git báo:
+
+```text
+fatal: Unable to read current working directory: No such file or directory
+```
+
+Nguyên nhân: kernel đang đứng trong thư mục clone cũ, nhưng cell 3 xóa thư mục
+đó trước khi gọi `git clone`. Notebook đã được sửa để chạy:
+
+```python
+os.chdir('/kaggle/working')
+```
+
+trước khi xóa và clone lại repository.
+
+Để sửa notebook Kaggle hiện tại ngay lập tức, chạy cell này trước khi chạy lại
+cell clone:
+
+```python
+import os
+os.chdir('/kaggle/working')
+```
+
+Sau đó chạy lại toàn bộ cell 3. Không cần restart kernel và không cần xóa
+dataset BGL trong `/kaggle/input`.
+
+### Checkpoint 6b — cell dữ liệu không tìm thấy BGL
+
+Cell dữ liệu báo:
+
+```text
+AssertionError: Thiếu data/BGL/BGL.log; không tìm thấy BGL trong /kaggle/input.
+```
+
+Nguyên nhân là cell dùng đường dẫn tương đối sau khi clone lại, hoặc dataset
+có cấu trúc thư mục sâu hơn mẫu `*/BGL/BGL.log`. Notebook đã được sửa để:
+
+- chuyển về `PROJECT` trước khi kiểm tra;
+- dùng đường dẫn tuyệt đối `PROJECT / 'data/BGL/BGL.log'`;
+- quét đệ quy `/kaggle/input/**/BGL.log`;
+- copy toàn bộ thư mục chứa `BGL.log` vào project.
+
+Trong notebook Kaggle hiện tại, chạy thủ công trước cell dữ liệu:
+
+```python
+PROJECT = Path('/kaggle/working/lv-new/LAnoBERT').resolve()
+os.chdir(PROJECT)
+print('PROJECT:', PROJECT)
+print('BGL candidates:', list(Path('/kaggle/input').rglob('BGL.log')))
+```
+
+Nếu danh sách có file BGL, chạy:
+
+```python
+candidates = list(Path('/kaggle/input').rglob('BGL.log'))
+assert candidates, 'Kaggle chưa mount dataset chứa BGL.log'
+source_bgl = candidates[0].parent
+target_bgl = PROJECT / 'data/BGL'
+target_bgl.mkdir(parents=True, exist_ok=True)
+for source in source_bgl.iterdir():
+    if source.is_file():
+        shutil.copy2(source, target_bgl / source.name)
+print('Copied:', source_bgl, '->', target_bgl)
+```
+
+### Ghi chú về `kaggle_runtime.yaml`
+
+File `kaggle_runtime.yaml` không nằm sẵn trên GitHub. Nó được notebook tạo
+tại bước **Tạo cấu hình Kaggle**, sau khi đã clone project và chuyển vào đúng
+thư mục:
+
+```text
+/kaggle/working/lv-new/LAnoBERT/configs/kaggle_runtime.yaml
+```
+
+Cell tạo file:
+
+```python
+import yaml
+
+with open(CONFIG, encoding='utf-8') as handle:
+    runtime = yaml.safe_load(handle)
+
+runtime.setdefault('train', {})['num_train_epochs'] = EPOCHS
+runtime.setdefault('inference', {})['max_eval_samples'] = MAX_EVAL_SAMPLES
+
+with open('configs/kaggle_runtime.yaml', 'w', encoding='utf-8') as handle:
+    yaml.safe_dump(runtime, handle, sort_keys=False)
+```
+
+Kiểm tra file:
+
+```python
+runtime_config = PROJECT / 'configs/kaggle_runtime.yaml'
+print(runtime_config)
+print(runtime_config.exists())
+```
+
+Nếu chưa có file, hãy chạy cell tạo cấu hình trước cell train và inference.
+
+### Checkpoint 7 — tạo runtime config local
+
+Đã tạo file cấu hình chạy thử Kaggle tại:
+
+```text
+configs/kaggle_runtime.yaml
+```
+
+Các thiết lập smoke run:
+
+```text
+num_train_epochs: 1
+max_eval_samples: 10000
+seed: 42
+```
+
+File này có thể dùng trực tiếp từ local:
+
+```bash
+cd /Users/ruby/dev/lv-new/LAnoBERT
+python3 -m lanobert.train --config configs/kaggle_runtime.yaml
+python3 -m lanobert.inference --config configs/kaggle_runtime.yaml
+```
+
+Khi chạy trên Kaggle, file sẽ nằm tương ứng tại:
+
+```text
+/kaggle/working/lv-new/LAnoBERT/configs/kaggle_runtime.yaml
+```
+
+### Checkpoint 8 — lỗi `overwrite_output_dir` trên Kaggle
+
+Kaggle dừng ở bước khởi tạo `TrainingArguments` với:
+
+```text
+TypeError: TrainingArguments.__init__() got an unexpected keyword argument
+'overwrite_output_dir'
+```
+
+Split và preprocessing đã thành công trước lỗi:
+
+```text
+train=3,461,232
+eval=34,961
+```
+
+Nguyên nhân là phiên bản `transformers` trong runtime Kaggle không hỗ trợ
+tham số này. Tham số không cần thiết cho pipeline hiện tại vì `output_dir`
+đã được truyền rõ ràng. Đã xóa `overwrite_output_dir=True` khỏi
+`lanobert/train.py`.
+
+Sau khi push commit sửa lên GitHub, cần clone lại repository trên Kaggle rồi
+chạy lại cell train. Không cần chạy lại preprocessing nếu các file trong
+`data/BGL/` vẫn còn.
