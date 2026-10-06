@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import math
 import os
 from typing import List, Optional
 
@@ -52,6 +53,9 @@ def _build_training_args(training_args_cls, values):
         target = name
         if target not in supported:
             target = aliases.get(name)
+        if name == "warmup_ratio" and target not in supported and "warmup_steps" in supported:
+            target = "warmup_steps"
+            value = values.get("warmup_steps", 0)
         if target in supported:
             normalized[target] = value
         else:
@@ -217,17 +221,23 @@ def train(cfg, vocab_file: Optional[str] = None) -> str:
     model_dir = ensure_dir(cfg.get_path("paths.model_dir"))
     eval_steps = int(tcfg.get("eval_steps", tcfg.get("save_steps", 50000)))
     seed = int(tcfg.get("seed", 42))
+    train_batch_size = int(tcfg.get("per_device_train_batch_size", 8))
+    epochs = float(tcfg.get("num_train_epochs", 10))
+    steps_per_epoch = math.ceil(train_size / train_batch_size)
+    warmup_ratio = float(tcfg.get("warmup_ratio", 0.1))
+    warmup_steps = int(math.ceil(steps_per_epoch * epochs * warmup_ratio))
     training_args = _build_training_args(TrainingArguments, {
         "output_dir": model_dir,
         "seed": seed,
         "data_seed": seed,
         "full_determinism": bool(tcfg.get("full_determinism", False)),
-        "num_train_epochs": float(tcfg.get("num_train_epochs", 10)),
-        "per_device_train_batch_size": int(tcfg.get("per_device_train_batch_size", 8)),
+        "num_train_epochs": epochs,
+        "per_device_train_batch_size": train_batch_size,
         "per_device_eval_batch_size": int(tcfg.get("per_device_eval_batch_size", 64)),
         "learning_rate": float(tcfg.get("learning_rate", 5e-5)),
         "weight_decay": float(tcfg.get("weight_decay", 0.01)),
-        "warmup_ratio": float(tcfg.get("warmup_ratio", 0.1)),
+        "warmup_ratio": warmup_ratio,
+        "warmup_steps": warmup_steps,
         "lr_scheduler_type": str(tcfg.get("lr_scheduler_type", "cosine")),
         "adam_beta2": float(tcfg.get("adam_beta2", 0.98)),
         "adam_epsilon": float(tcfg.get("adam_epsilon", 1e-6)),

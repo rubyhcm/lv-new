@@ -131,6 +131,31 @@ label 0: 903310
 label 1: 348460
 ```
 
+### Checkpoint 20 — notebook chuyển sang E0 baseline theo paper
+
+Đã cập nhật `kaggle_github_step_by_step.ipynb` để chạy trực tiếp baseline E0,
+không còn tạo hoặc dùng `configs/kaggle_runtime.yaml`. Notebook hiện:
+
+1. clone repository và in commit;
+2. dùng `configs/bgl_baseline.yaml`;
+3. chuẩn bị BGL và kiểm tra các file split/preprocess;
+4. train tokenizer riêng tại `outputs/BGL/baseline_tokenizer`;
+5. xác nhận vocabulary 1000 và MLM probe với xác suất mask 20%;
+6. xác nhận đúng phân bố test labels `903310` normal + `348460` anomaly;
+7. train full normal corpus trong 10 epochs với batch size 32;
+8. chạy inference trên toàn bộ `1,251,770` test lines;
+9. in các report loss/probability/top-k và đóng gói artifact E0.
+
+Các điểm này bám theo paper: chỉ dùng normal logs khi train, không dùng NSP,
+mask 20%, test có cả normal và anomaly, và anomaly score được tính bằng
+predictive loss/probability với top-k aggregation. Smoke config vẫn tồn tại
+cho chẩn đoán kỹ thuật nhưng không còn nằm trong đường chạy baseline notebook.
+
+Đồng thời đã sửa tương thích `warmup_ratio`: nếu phiên bản Transformers không
+có tham số này nhưng có `warmup_steps`, training sẽ tính số bước warmup tương
+đương từ kích thước tập train, batch size, số epoch và truyền `warmup_steps`.
+Như vậy Kaggle không còn âm thầm bỏ qua warmup của cấu hình E0.
+
 Các giai đoạn được ưu tiên triển khai:
 
 1. Giữ LAnoBERT làm baseline bất biến.
