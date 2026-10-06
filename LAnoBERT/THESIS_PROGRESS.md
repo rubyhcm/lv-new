@@ -937,3 +937,63 @@ python3 -m lanobert.inference --config configs/bgl_baseline.yaml
 Trên Kaggle, dùng cùng các lệnh qua `subprocess.run(..., cwd=PROJECT)` và
 truyền `configs/bgl_baseline.yaml`. Không chạy `ensure_data.sh` lại nếu các
 file dữ liệu đã tồn tại; config baseline dùng lại các file BGL đã preprocess.
+
+### Checkpoint 14 — Kaggle validation pass
+
+Cell kiểm tra trước training đã thành công trên Kaggle:
+
+```text
+Project: /kaggle/working/lv-new/LAnoBERT
+Tokenizer vocab size: 1000
+Train corpus exists: True
+Train corpus size: 264.44 MB
+Dataset examples: 3,496,193
+Masked labels in probe batch: 22
+Validation OK: có thể bắt đầu training.
+```
+
+Điều này xác nhận lỗi tokenizer `vocab=5` đã được sửa đúng và dữ liệu MLM
+không bị rỗng. Có thể chạy smoke training 1 epoch trong
+`configs/kaggle_runtime.yaml`. Chỉ chấp nhận run nếu log có `loss` hữu hạn và
+lớn hơn 0, `grad_norm` khác 0, và `eval_loss` không phải `nan`. Sau smoke run
+thành công mới chạy E0 bằng `configs/bgl_baseline.yaml` với 10 epochs.
+
+### Checkpoint 15 — Kaggle SIGKILL do giới hạn bộ nhớ smoke run
+
+Sau validation, training bị dừng với `Signals.SIGKILL: 9`. Đây không phải
+exception của Python hay lỗi tokenizer. Code cũ pre-tokenize toàn bộ
+3,496,193 dòng và giữ các list `input_ids`, `attention_mask` và
+`special_tokens_mask` trong RAM; cell validation trước đó cũng tạo dataset
+toàn bộ trước khi gọi subprocess train. Kaggle có thể giết tiến trình khi
+vượt giới hạn RAM.
+
+Đã sửa `LogLineDataset` hỗ trợ `limit`, truyền `train.max_train_samples` từ
+config, và đặt smoke config ở 10,000 dòng. Batch smoke cũng giảm từ 32 xuống
+8 để giảm áp lực VRAM. Notebook validation dùng cùng giới hạn 10,000 dòng.
+Config E0 baseline không bị thay đổi và vẫn dùng toàn bộ dữ liệu với batch 32.
+
+### Checkpoint 16 — phân biệt smoke test và baseline khoa học
+
+Không được dùng `configs/kaggle_runtime.yaml` để báo cáo baseline. Đây chỉ là
+smoke test kỹ thuật với:
+
+```text
+max_train_samples: 10000
+num_train_epochs: 1
+per_device_train_batch_size: 8
+max_eval_samples: 10000
+```
+
+Các thay đổi sau không được coi là thay đổi phương pháp khi chạy E0:
+
+- sửa `BertTokenizerFast` để truyền đúng vocabulary trong Transformers hiện
+  tại; nếu không, model chỉ có 5 special tokens và run hoàn toàn không hợp lệ;
+- lọc keyword theo signature của `TrainingArguments` để tương thích phiên bản
+  Transformers trên Kaggle;
+- validation guard trước training.
+
+Ngược lại, giới hạn số dòng, số epoch, batch size hoặc evaluation samples là
+thay đổi thực nghiệm và chỉ được dùng cho smoke test. E0 phải chạy bằng
+`configs/bgl_baseline.yaml`, dùng toàn bộ corpus, 10 epochs, batch 32 và toàn
+ bộ evaluation set. Kết quả smoke test không được đưa vào bảng kết quả luận
+ văn.

@@ -182,6 +182,7 @@ def train(cfg, vocab_file: Optional[str] = None) -> str:
         tokenizer=tokenizer,
         file_path=cfg.get_path("paths.train_normal"),
         max_len=max_len,
+        limit=tcfg.get("max_train_samples", None),
     )
 
     # Hold out a small validation split so we can track eval_loss and keep the

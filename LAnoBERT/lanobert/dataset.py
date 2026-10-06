@@ -26,14 +26,26 @@ class LogLineDataset(Dataset):
         skip_empty: drop blank lines.
     """
 
-    def __init__(self, tokenizer, file_path: str, max_len: int = 512, skip_empty: bool = True):
+    def __init__(
+        self,
+        tokenizer,
+        file_path: str,
+        max_len: int = 512,
+        skip_empty: bool = True,
+        limit: int | None = None,
+    ):
         assert os.path.isfile(file_path), f"Input file not found: {file_path}"
         self.max_len = max_len
 
         with open(file_path, "r", encoding="utf-8") as f:
-            lines = [ln.strip() for ln in f]
-        if skip_empty:
-            lines = [ln for ln in lines if ln]
+            lines = []
+            for line in f:
+                line = line.strip()
+                if skip_empty and not line:
+                    continue
+                lines.append(line)
+                if limit is not None and len(lines) >= limit:
+                    break
 
         # Pre-tokenize all lines once so __getitem__ is just an index lookup.
         print(f"[dataset] pre-tokenizing {len(lines):,} lines...")
