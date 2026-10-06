@@ -156,6 +156,26 @@ có tham số này nhưng có `warmup_steps`, training sẽ tính số bước w
 đương từ kích thước tập train, batch size, số epoch và truyền `warmup_steps`.
 Như vậy Kaggle không còn âm thầm bỏ qua warmup của cấu hình E0.
 
+### Checkpoint 21 — sửa truy cập nested config trong notebook
+
+Cell xác nhận baseline từng dùng `baseline_cfg.get('train.num_train_epochs')`.
+`Config.get()` chỉ đọc key cấp cao nhất; API truy cập nested dotted path của
+project là `get_path()`. Vì vậy biểu thức cũ trả về `None` và gây:
+
+```text
+TypeError: int() argument must be a string ... not 'NoneType'
+```
+
+Đã sửa notebook dùng:
+
+```python
+baseline_cfg.get_path('train.num_train_epochs')
+baseline_cfg.get_path('train.per_device_train_batch_size')
+baseline_cfg.get_path('inference.max_eval_samples')
+```
+
+Đây chỉ là sửa validation cell, không thay đổi cấu hình hoặc kết quả baseline.
+
 Các giai đoạn được ưu tiên triển khai:
 
 1. Giữ LAnoBERT làm baseline bất biến.
