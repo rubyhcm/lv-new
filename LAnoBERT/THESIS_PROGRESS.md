@@ -39,6 +39,98 @@ Các chỉ số chính:
 - `result-7.md`: đặc tả phần mềm và ranh giới hệ thống.
 - `result-9.md`: lộ trình triển khai và kế hoạch luận văn.
 
+### Checkpoint 17 — smoke training có loss và gradient hợp lệ
+
+Log training Kaggle mới cho thấy smoke run đã học thực sự:
+
+```text
+step đầu: loss=0.7508, grad_norm=2.91
+loss khoảng epoch 0.2: 0.08916
+loss khoảng epoch 0.5: 0.05263
+loss cuối log: 0.03416, grad_norm=0.3112
+epoch cuối log: 0.9245
+```
+
+Learning rate giảm từ xấp xỉ `1e-4` xuống `1.4e-6` theo cosine schedule và
+`grad_norm` không bị cố định ở 0. Đây là bằng chứng smoke run đã tránh được
+lỗi tokenizer 5 token/loss 0 trước đó.
+
+Tuy nhiên, log này chưa đủ để báo cáo kết quả: cần phần cuối chứa
+`eval_loss`, `train_loss`, trạng thái hoàn tất và output inference. Vì đây là
+smoke config giới hạn dữ liệu/epoch, chỉ dùng để xác nhận pipeline kỹ thuật;
+E0 vẫn phải chạy riêng bằng `configs/bgl_baseline.yaml`.
+
+### Checkpoint 18 — xác minh run Kaggle thực tế dùng toàn bộ corpus
+
+Output đầy đủ của run cho thấy:
+
+```text
+[dataset] pre-tokenizing 3,496,193 lines...
+[train] examples: train=3,461,232 eval=34,961
+0/54082 ... 54082/54082
+eval_loss=0.03614
+[train] saved final model -> outputs/BGL/model/final
+```
+
+Vì vậy run này **không phải smoke run 10,000 dòng** như cấu hình runtime mới.
+Nó là run 1 epoch trên toàn bộ corpus, với 3,461,232 examples train và
+34,961 examples eval. Run đã hoàn tất thành công về kỹ thuật:
+
+```text
+eval_loss=0.03614
+loss cuối=0.03658
+grad_norm cuối=0.6546
+```
+
+Nhưng vẫn chưa phải E0 chính thức vì mới có `epoch=1`, artifact nằm trong
+`outputs/BGL/model/` thay vì thư mục baseline, và log cho biết Transformers đã
+bỏ qua `warmup_ratio` cùng `logging_dir`. Không dùng artifact hoặc metric của
+run này để báo cáo E0. Cần chạy lại bằng `configs/bgl_baseline.yaml`, xác nhận
+đúng config/commit trước khi bắt đầu, và ghi nhận rõ nếu runtime Transformers
+không hỗ trợ warmup ratio.
+
+### Checkpoint 19 — cảnh báo scoring do smoke evaluation chỉ chứa normal
+
+Kaggle xuất hiện nhiều cảnh báo sklearn:
+
+```text
+No positive samples in y_true
+No positive class found in y_true
+```
+
+Nguyên nhân không phải model không tạo anomaly score. File BGL test được sắp
+xếp như sau:
+
+```text
+903,310 dòng normal (label 0)
+348,460 dòng anomaly (label 1)
+```
+
+Trong smoke config, `max_eval_samples: 10000` lấy 10,000 dòng đầu tiên. Vì
+toàn bộ 10,000 dòng này nằm trong đoạn normal, `y_true` chỉ có class 0. Vì
+vậy AUROC, recall và F1 của smoke inference không có ý nghĩa và không được
+báo cáo.
+
+E0 phải dùng `configs/bgl_baseline.yaml` với:
+
+```yaml
+max_eval_samples: null
+```
+
+để đánh giá toàn bộ 1,251,770 mẫu, gồm cả 903,310 normal và 348,460 anomaly.
+Trước mỗi inference cần kiểm tra log:
+
+```text
+[infer] test lines: 1251770  labels: 1251770
+```
+
+và phân bố label phải là:
+
+```text
+label 0: 903310
+label 1: 348460
+```
+
 Các giai đoạn được ưu tiên triển khai:
 
 1. Giữ LAnoBERT làm baseline bất biến.
